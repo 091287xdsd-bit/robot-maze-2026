@@ -12,34 +12,30 @@
         :root { --neon: #00f2ff; --bg: #050505; --card: #111; --accent: #ff0055; --gray: #444; }
         body { font-family: 'Inter', sans-serif; background: var(--bg); color: white; margin: 0; padding: 20px; }
         
-        /* Layout */
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--neon); padding-bottom: 10px; margin-bottom: 20px; }
         .live-tag { background: var(--accent); padding: 5px 15px; border-radius: 4px; font-weight: bold; animation: blink 1s infinite; }
 
-        /* Setup Section */
-        .setup-box { background: var(--card); padding: 20px; border-radius: 12px; display: flex; gap: 15px; margin-bottom: 20px; align-items: center; border: 1px solid #333; }
+        /* MẶC ĐỊNH ẨN CÁC THÀNH PHẦN CỦA ADMIN */
+        .admin-only { display: none !important; }
+        
+        /* NẾU LÀ ADMIN THÌ MỚI HIỆN RA */
+        body.is-admin .admin-only { display: flex !important; }
+        body.is-admin button.admin-only { display: inline-block !important; }
+        body.is-admin th.admin-only, body.is-admin td.admin-only { display: table-cell !important; }
+
+        .setup-box { background: var(--card); padding: 20px; border-radius: 12px; gap: 15px; margin-bottom: 20px; align-items: center; border: 1px solid #333; }
         input, select { background: #222; border: 1px solid #444; color: white; padding: 10px; border-radius: 5px; font-size: 1rem; }
 
-        /* Timer - Chống nhảy số tuyệt đối */
         .main-display { text-align: center; background: radial-gradient(circle, #1a1a1a 0%, #050505 100%); padding: 40px; border-radius: 30px; border: 1px solid #222; margin-bottom: 30px; }
         .current-team-name { font-size: 1.5rem; color: var(--neon); text-transform: uppercase; letter-spacing: 5px; margin-bottom: 15px; }
-        #display { 
-            font-family: 'JetBrains Mono', monospace; 
-            font-size: 8rem; 
-            color: white; 
-            text-shadow: 0 0 30px var(--neon); 
-            display: inline-block;
-            letter-spacing: -2px;
-        }
+        #display { font-family: 'JetBrains Mono', monospace; font-size: 8rem; color: white; text-shadow: 0 0 30px var(--neon); display: inline-block; letter-spacing: -2px; }
 
-        /* Tabs & Controls */
         .tab-container { display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap; }
         .tab { padding: 8px 20px; background: #222; border: 1px solid #444; cursor: pointer; border-radius: 5px; transition: 0.3s; }
         .tab.active { background: var(--neon); color: black; font-weight: bold; }
         .btn-reset { background: transparent; border: 1px solid var(--accent); color: var(--accent); padding: 5px 10px; cursor: pointer; border-radius: 4px; font-size: 0.7rem; }
         .btn-reset:hover { background: var(--accent); color: white; }
 
-        /* Tables & Stats */
         .stats-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; }
         .box { background: var(--card); border-radius: 12px; padding: 20px; border: 1px solid #222; }
         h3 { border-left: 4px solid var(--neon); padding-left: 10px; margin: 0 0 15px 0; display: flex; justify-content: space-between; align-items: center; }
@@ -58,10 +54,10 @@
 
 <div class="header">
     <div style="font-size: 1.2rem; font-weight: bold; letter-spacing: 2px;">ROBOT MAZE <span style="color:var(--neon)">CHAMPIONSHIP 2026</span></div>
-    <div class="live-tag">● LIVE</div>
+    <div class="live-tag">● LIVE STREAM</div>
 </div>
 
-<div class="setup-box">
+<div class="setup-box admin-only">
     <input type="text" id="teamInput" placeholder="TÊN ĐỘI..." style="flex-grow: 1;">
     <select id="roundSelect">
         <option value="Vòng Loại 1">Vòng Loại 1</option>
@@ -82,12 +78,12 @@
     <div class="box">
         <h3>
             BẢNG XẾP HẠNG
-            <button class="btn-reset" onclick="resetRound()">RESET VÒNG NÀY</button>
+            <button class="btn-reset admin-only" onclick="resetRound()">RESET VÒNG NÀY</button>
         </h3>
         <div id="tabList" class="tab-container"></div>
         <table>
             <thead>
-                <tr><th>#</th><th>Đội</th><th>Kết Quả</th><th>Hành động</th></tr>
+                <tr><th>#</th><th>Đội</th><th>Kết Quả</th><th class="admin-only">Hành động</th></tr>
             </thead>
             <tbody id="leaderboardBody"></tbody>
         </table>
@@ -96,7 +92,7 @@
     <div class="box">
         <h3>
             CHI TIẾT ĐỘI
-            <button class="btn-reset" onclick="resetTeam()">RESET ĐỘI NÀY</button>
+            <button class="btn-reset admin-only" onclick="resetTeam()">RESET ĐỘI NÀY</button>
         </h3>
         <select id="teamFilter" onchange="showTeamStats()" style="width:100%; margin-bottom:15px;"></select>
         <div id="teamStatsContent"></div>
@@ -104,7 +100,16 @@
 </div>
 
 <script>
-    let startTime, timerInterval;
+    // --- 1. HỆ THỐNG PHÂN QUYỀN ADMIN BẰNG URL ---
+    const urlParams = new URLSearchParams(window.location.search);
+    const isAdmin = urlParams.get('admin') === 'phongtin'; // Pass bí mật của bạn
+    
+    if (isAdmin) {
+        // Mở khóa giao diện hiển thị các nút điều khiển
+        document.body.classList.add('is-admin');
+    }
+
+    // --- 2. KẾT NỐI FIREBASE ---
     const firebaseConfig = {
         apiKey: "AIzaSyAmvTxTxZ-xfRPtyPCRe9eQ8q2T0dRFfqs",
         authDomain: "robot-maze-2026.firebaseapp.com",
@@ -120,97 +125,138 @@
         firebase.initializeApp(firebaseConfig);
     }
     const db = firebase.database();
+    
+    // --- 3. ĐỒNG BỘ THỜI GIAN MÁY CHỦ (CHỐNG TRỄ GIÂY) ---
+    let serverOffset = 0;
+    db.ref('.info/serverTimeOffset').on('value', function(snapshot) {
+        serverOffset = snapshot.val() || 0;
+    });
+    function getTrueTime() { return Date.now() + serverOffset; }
+
     let database = [];
     let currentTab = "Vòng Loại 1";
-    
+    let startTime = 0;
+    let timerInterval;
+
+    // Lắng nghe dữ liệu Bảng xếp hạng
     db.ref("maze_results").on("value", (snapshot) => {
         const data = snapshot.val();
         database = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
         renderAll();
     });
 
-    // Format thời gian 00:00:00:000
+    // Format hiển thị
     function formatTime(ms) {
         let hours = Math.floor(ms / 3600000);
         let minutes = Math.floor((ms % 3600000) / 60000);
         let seconds = Math.floor((ms % 60000) / 1000);
         let milis = ms % 1000;
-
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${milis.toString().padStart(3, '0')}`;
     }
 
-    function updateDisplay() {
-        const diff = Date.now() - startTime;
-        document.getElementById("display").innerText = formatTime(diff);
-    }
-
+    // --- 4. LOGIC ĐIỀU KHIỂN CỦA ADMIN ---
     function startTimer() {
-        const teamName = document.getElementById("teamInput").value || "Ẩn danh";
-        document.getElementById("activeTeam").innerText = teamName;
-        clearInterval(timerInterval);
-        startTime = Date.now();
-        timerInterval = setInterval(updateDisplay, 10);
-    }
-
-    function stopTimer() {
-        clearInterval(timerInterval);
-        const finalElapsed = Date.now() - startTime; 
-        const finalTimeStr = formatTime(finalElapsed);
-        document.getElementById("display").innerText = finalTimeStr;
-
+        if (!isAdmin) return; // Khóa chức năng với khách
+        
         const teamName = document.getElementById("teamInput").value || "Ẩn danh";
         const roundName = document.getElementById("roundSelect").value;
         
-        const record = { 
-            team: teamName, 
-            round: roundName, 
-            time: finalElapsed, 
-            timeStr: finalTimeStr,
-            timestamp: Date.now() // PHẢI CÓ DÒNG NÀY để web tự nhảy số
-        };
+        // Gửi tín hiệu báo "Đang chạy" cho tất cả mọi người xem
+        db.ref("current_state").set({
+            status: "running",
+            team: teamName,
+            round: roundName,
+            startTimestamp: getTrueTime()
+        });
+    }
+
+    function stopTimer() {
+        if (!isAdmin) return; // Khóa chức năng với khách
         
-        db.ref("maze_results").push(record); // Firebase tự tạo ID duy nhất
-        currentTab = roundName;
+        const stopTimestamp = getTrueTime();
+        
+        // Tính giờ thực tế từ Firebase để chốt kết quả siêu chính xác
+        db.ref("current_state").once("value", (snapshot) => {
+            const state = snapshot.val();
+            if(state && state.status === "running") {
+                const finalElapsed = stopTimestamp - state.startTimestamp;
+                const finalTimeStr = formatTime(finalElapsed);
+                
+                // Báo cho khán giả dừng đồng hồ
+                db.ref("current_state").set({
+                    status: "stopped",
+                    finalTimeStr: finalTimeStr,
+                    team: state.team
+                });
+
+                // Lưu lên bảng xếp hạng
+                const record = { 
+                    team: state.team, 
+                    round: state.round, 
+                    time: finalElapsed, 
+                    timeStr: finalTimeStr,
+                    timestamp: getTrueTime()
+                };
+                db.ref("maze_results").push(record);
+                currentTab = state.round;
+            }
+        });
     }
 
     function deleteRecord(id) {
+        if(!isAdmin) return;
         if(confirm("Xóa kết quả này trên Cloud?")) {
-            db.ref("maze_results/" + id).remove(); // id ở đây là Key của Firebase
+            db.ref("maze_results/" + id).remove();
         }
     }
 
-    // RESET CẢ VÒNG TRÊN CLOUD
     function resetRound() {
-        if(confirm(`Bạn có chắc muốn xóa TẤT CẢ kết quả của ${currentTab} trên hệ thống Cloud?`)) {
-            // Lọc ra những ID thuộc vòng này và xóa từng cái trên Firebase
+        if(!isAdmin) return;
+        if(confirm(`Xóa TẤT CẢ kết quả của ${currentTab}?`)) {
             database.forEach(item => {
-                if(item.round === currentTab) {
-                    db.ref("maze_results/" + item.id).remove();
-                }
+                if(item.round === currentTab) db.ref("maze_results/" + item.id).remove();
             });
         }
     }
 
-    // RESET THEO ĐỘI TRÊN CLOUD
     function resetTeam() {
+        if(!isAdmin) return;
         const team = document.getElementById("teamFilter").value;
         if(!team) return;
-        if(confirm(`Xóa toàn bộ lịch sử thi đấu của đội ${team} trên hệ thống Cloud?`)) {
+        if(confirm(`Xóa lịch sử thi đấu của đội ${team}?`)) {
             database.forEach(item => {
-                if(item.team === team) {
-                    db.ref("maze_results/" + item.id).remove();
-                }
+                if(item.team === team) db.ref("maze_results/" + item.id).remove();
             });
         }
     }
 
-    function saveAndRender() {
-        localStorage.setItem('mazeData', JSON.stringify(database));
-        renderAll();
-    }
+    // --- 5. LẮNG NGHE TÍN HIỆU LIVE TỪ ADMIN (DÀNH CHO KHÁN GIẢ) ---
+    db.ref("current_state").on("value", (snapshot) => {
+        const state = snapshot.val();
+        if (!state) return;
 
+        if (state.status === "running") {
+            // Khi Admin bấm Start, khán giả tự khởi động đồng hồ dựa trên mốc Server
+            document.getElementById("activeTeam").innerText = state.team;
+            startTime = state.startTimestamp;
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                const diff = getTrueTime() - startTime;
+                document.getElementById("display").innerText = formatTime(diff > 0 ? diff : 0);
+            }, 10);
+            
+        } else if (state.status === "stopped") {
+            // Khi Admin bấm Stop, ép hiện số chính xác cuối cùng
+            clearInterval(timerInterval);
+            if (state.finalTimeStr) {
+                document.getElementById("display").innerText = state.finalTimeStr;
+            }
+        }
+    });
+
+    // --- 6. RENDER GIAO DIỆN ---
     function renderAll() {
-        // Render Tabs
         const rounds = ["Vòng Loại 1", "Vòng Loại 2", "Bán Kết", "Chung Kết"];
         let tabsHtml = "";
         rounds.forEach(r => {
@@ -218,7 +264,6 @@
         });
         document.getElementById("tabList").innerHTML = tabsHtml;
 
-        // Render Leaderboard
         const lbBody = document.getElementById("leaderboardBody");
         lbBody.innerHTML = "";
         const filtered = database.filter(i => i.round === currentTab).sort((a,b) => a.time - b.time);
@@ -228,11 +273,10 @@
                 <td class="${index < 3 ? 'rank-gold' : ''}">#${index + 1}</td>
                 <td>${item.team}</td>
                 <td style="color:var(--neon); font-family: 'JetBrains Mono'">${item.timeStr}</td>
-                <td><button class="delete-btn" onclick="deleteRecord('${item.id}')">✖</button></td>
+                <td class="admin-only"><button class="delete-btn" onclick="deleteRecord('${item.id}')">✖</button></td>
             </tr>`;
         });
 
-        // Update Team Filter
         const filter = document.getElementById("teamFilter");
         const teams = [...new Set(database.map(item => item.team))];
         filter.innerHTML = '<option value="">-- Chọn đội để xem --</option>' + 
@@ -256,18 +300,6 @@
         content.innerHTML = html;
     }
 
-    renderAll();
-
-    // lấy d.liệu mới nht từ firebase để cập nhật real-time
-    db.ref("maze_results").limitToLast(1).on("child_added", (snapshot) => {
-        const newRun = snapshot.val();
-        
-        if (Date.now() - newRun.timestamp < 2000) {
-            document.getElementById("display").innerText = newRun.timeStr;
-            document.getElementById("activeTeam").innerText = newRun.team;
-            renderAll();
-        }
-    });
 </script>
 </body>
 </html>
