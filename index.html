@@ -67,6 +67,7 @@
     </select>
     <button onclick="startTimer()" style="background:var(--neon); color:black; font-weight:bold; padding: 12px 30px; border-radius: 6px; border:none; cursor:pointer;">START</button>
     <button onclick="stopTimer()" style="background:var(--accent); color:white; font-weight:bold; padding: 12px 30px; border-radius: 6px; border:none; cursor:pointer;">STOP</button>
+    <button onclick="resetClock()" style="background:var(--gray); color:white; font-weight:bold; padding: 12px 20px; border-radius: 6px; border:none; cursor:pointer;" class="admin-only">RESET CLOCK</button>
 </div>
 
 <div class="main-display">
@@ -102,7 +103,7 @@
 <script>
     // --- 1. HỆ THỐNG PHÂN QUYỀN ADMIN BẰNG URL ---
     const urlParams = new URLSearchParams(window.location.search);
-    const isAdmin = urlParams.get('admin') === 'phongtin'; // Pass bí mật của bạn
+    const isAdmin = urlParams.get('admin') === 'phongtin'; // Pass
     
     if (isAdmin) {
         // Mở khóa giao diện hiển thị các nút điều khiển
@@ -203,6 +204,16 @@
         });
     }
 
+    function resetClock() {
+        if (!isAdmin) return;
+        
+        // Gửi tín hiệu reset về 00:00:00:000 cho tất cả mọi người
+        db.ref("current_state").set({
+            status: "reset",
+            team: "SẴN SÀNG"
+        });
+    }
+
     function deleteRecord(id) {
         if(!isAdmin) return;
         if(confirm("Xóa kết quả này trên Cloud?")) {
@@ -246,12 +257,16 @@
                 document.getElementById("display").innerText = formatTime(diff > 0 ? diff : 0);
             }, 10);
             
+        
         } else if (state.status === "stopped") {
-            // Khi Admin bấm Stop, ép hiện số chính xác cuối cùng
             clearInterval(timerInterval);
             if (state.finalTimeStr) {
                 document.getElementById("display").innerText = state.finalTimeStr;
             }
+        } else if (state.status === "reset") {
+            clearInterval(timerInterval);
+            document.getElementById("display").innerText = "00:00:00:000";
+            document.getElementById("activeTeam").innerText = state.team;
         }
     });
 
