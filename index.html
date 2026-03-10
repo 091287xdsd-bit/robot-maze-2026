@@ -251,6 +251,7 @@
     // Xóa một kết quả thi đấu cụ thể
     function deleteRecord(id) {
         if(!isAdmin) return;
+        playSfx('failed'); // Phát âm thanh xóa
         if(confirm("Xóa kết quả này trên Cloud?")) {
             db.ref("maze_results/" + id).remove();
         }
@@ -285,7 +286,7 @@
 
         if (state.status === "running") {
             // Khi Admin bấm Start, khán giả tự khởi động đồng hồ dựa trên mốc Server
-            playSfx('ready'); // Phát âm thanh sẵn sàng
+            playSfx('go'); // Phát âm thanh sẵn sàng
             document.getElementById("activeTeam").innerText = state.team;
             startTime = state.startTimestamp;
             
