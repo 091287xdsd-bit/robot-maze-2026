@@ -127,6 +127,21 @@
     }
     const db = firebase.database();
     
+    // Hệ thống âm thanh
+    const sounds = {
+        go: new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3'), // Tiếng beep go
+        finish: new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'), // Tiếng chuông về đích
+        ready: new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'), // Tiếng máy sẵn sàng
+        failed: new Audio('https://assets.mixkit.co/active_storage/sfx/253/253-preview.mp3'), // Tiếng "ố ồ" khi xóa
+        victory: new Audio('https://assets.mixkit.co/active_storage/sfx/1433/1433-preview.mp3') // Tiếng vỗ tay/vui vẻ
+    };
+
+    // Hàm hỗ trợ phát âm thanh
+    function playSfx(name) {
+        sounds[name].currentTime = 0; // Chơi lại từ đầu nếu đang phát nửa chừng
+        sounds[name].play().catch(e => console.log("Cần tương tác với web để phát nhạc"));
+    }
+
     // --- 3. ĐỒNG BỘ THỜI GIAN MÁY CHỦ (CHỐNG TRỄ GIÂY) ---
     let serverOffset = 0;
     db.ref('.info/serverTimeOffset').on('value', function(snapshot) {
@@ -138,11 +153,31 @@
     let currentTab = "Vòng Loại 1";
     let startTime = 0;
     let timerInterval;
+    let records = {
+        "Vòng Loại 1": Infinity,
+        "Vòng Loại 2": Infinity,
+        "Bán Kết": Infinity,
+        "Chung Kết": Infinity
+    };
 
     // Lắng nghe dữ liệu Bảng xếp hạng
     db.ref("maze_results").on("value", (snapshot) => {
         const data = snapshot.val();
-        database = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
+        const newData = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
+        
+        // Tìm thời gian nhanh nhất của vòng đang thi đấu
+        const timesInRound = newData.filter(i => i.round === currentTab).map(i => i.time);
+        const currentBest = timesInRound.length > 0 ? Math.min(...timesInRound) : Infinity;
+
+        // Nếu kỷ lục mới tốt hơn kỷ lục cũ và không phải lần đầu load trang
+        if (currentBest < records[currentTab] && records[currentTab] !== Infinity) {
+            playSfx('victory'); // Phát nhạc chiến thắng
+            showVictoryEffect(); // Làm màn hình nhấp nháy vàng
+        }
+
+        // Cập nhật kỷ lục vào sổ tay
+        records[currentTab] = currentBest;
+        database = newData;
         renderAll();
     });
 
@@ -155,10 +190,10 @@
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${milis.toString().padStart(3, '0')}`;
     }
 
-    // --- 4. LOGIC ĐIỀU KHIỂN CỦA ADMIN ---
+    // 4. LOGIC ĐIỀU KHIỂN CỦA ADMIN
     function startTimer() {
         if (!isAdmin) return; // Khóa chức năng với khách
-        
+        playSfx('go');
         const teamName = document.getElementById("teamInput").value || "Ẩn danh";
         const roundName = document.getElementById("roundSelect").value;
         
@@ -171,11 +206,12 @@
         });
     }
 
+    // Hàm dừng đồng hồ và chốt kết quả
     function stopTimer() {
         if (!isAdmin) return; // Khóa chức năng với khách
-        
+        playSfx('finish');
+
         const stopTimestamp = getTrueTime();
-        
         // Tính giờ thực tế từ Firebase để chốt kết quả siêu chính xác
         db.ref("current_state").once("value", (snapshot) => {
             const state = snapshot.val();
@@ -204,9 +240,10 @@
         });
     }
 
+    // Hàm reset đồng hồ về 00:00:00:000 và trạng thái sẵn sàng
     function resetClock() {
         if (!isAdmin) return;
-        
+        playSfx('ready');
         // Gửi tín hiệu reset về 00:00:00:000 cho tất cả mọi người
         db.ref("current_state").set({
             status: "reset",
@@ -214,13 +251,16 @@
         });
     }
 
+    // Xóa một kết quả thi đấu cụ thể
     function deleteRecord(id) {
         if(!isAdmin) return;
+        playSfx('failed');
         if(confirm("Xóa kết quả này trên Cloud?")) {
             db.ref("maze_results/" + id).remove();
         }
     }
 
+    // Xóa toàn bộ kết quả của vòng đang xem
     function resetRound() {
         if(!isAdmin) return;
         if(confirm(`Xóa TẤT CẢ kết quả của ${currentTab}?`)) {
@@ -230,6 +270,7 @@
         }
     }
 
+    // Xóa toàn bộ lịch sử thi đấu của đội được chọn
     function resetTeam() {
         if(!isAdmin) return;
         const team = document.getElementById("teamFilter").value;
@@ -241,7 +282,7 @@
         }
     }
 
-    // --- 5. LẮNG NGHE TÍN HIỆU LIVE TỪ ADMIN (DÀNH CHO KHÁN GIẢ) ---
+    // 5. Lệnh admin cho khán giả
     db.ref("current_state").on("value", (snapshot) => {
         const state = snapshot.val();
         if (!state) return;
@@ -270,7 +311,7 @@
         }
     });
 
-    // --- 6. RENDER GIAO DIỆN ---
+    // 6. render lại toàn bộ giao diện khi có thay đổi dữ liệu
     function renderAll() {
         const rounds = ["Vòng Loại 1", "Vòng Loại 2", "Bán Kết", "Chung Kết"];
         let tabsHtml = "";
@@ -299,6 +340,7 @@
         showTeamStats();
     }
 
+    // 7. Hiển thị chi tiết lịch sử thi đấu của đội khi
     function showTeamStats() {
         const team = document.getElementById("teamFilter").value;
         const content = document.getElementById("teamStatsContent");
@@ -313,6 +355,20 @@
             </div>`;
         });
         content.innerHTML = html;
+    }
+
+    // 8. Hiệu ứng chiến thắng khi có kỷ lục mới
+    function showVictoryEffect() {
+        let count = 0;
+        const originalBg = "#050505";
+        const interval = setInterval(() => {
+            document.body.style.background = count % 2 === 0 ? "#ffd700" : originalBg;
+            count++;
+            if (count > 6) {
+                clearInterval(interval);
+                document.body.style.background = originalBg;
+            }
+        }, 200);
     }
 
 </script>
