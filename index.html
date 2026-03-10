@@ -193,7 +193,6 @@
     // 4. LOGIC ĐIỀU KHIỂN CỦA ADMIN
     function startTimer() {
         if (!isAdmin) return; // Khóa chức năng với khách
-        playSfx('go');
         const teamName = document.getElementById("teamInput").value || "Ẩn danh";
         const roundName = document.getElementById("roundSelect").value;
         
@@ -209,7 +208,6 @@
     // Hàm dừng đồng hồ và chốt kết quả
     function stopTimer() {
         if (!isAdmin) return; // Khóa chức năng với khách
-        playSfx('finish');
 
         const stopTimestamp = getTrueTime();
         // Tính giờ thực tế từ Firebase để chốt kết quả siêu chính xác
@@ -243,7 +241,6 @@
     // Hàm reset đồng hồ về 00:00:00:000 và trạng thái sẵn sàng
     function resetClock() {
         if (!isAdmin) return;
-        playSfx('ready');
         // Gửi tín hiệu reset về 00:00:00:000 cho tất cả mọi người
         db.ref("current_state").set({
             status: "reset",
@@ -254,7 +251,6 @@
     // Xóa một kết quả thi đấu cụ thể
     function deleteRecord(id) {
         if(!isAdmin) return;
-        playSfx('failed');
         if(confirm("Xóa kết quả này trên Cloud?")) {
             db.ref("maze_results/" + id).remove();
         }
@@ -289,6 +285,7 @@
 
         if (state.status === "running") {
             // Khi Admin bấm Start, khán giả tự khởi động đồng hồ dựa trên mốc Server
+            playSfx('ready'); // Phát âm thanh sẵn sàng
             document.getElementById("activeTeam").innerText = state.team;
             startTime = state.startTimestamp;
             
@@ -300,11 +297,13 @@
             
         
         } else if (state.status === "stopped") {
+            playSfx('finish'); // Phát âm thanh kết thúc
             clearInterval(timerInterval);
             if (state.finalTimeStr) {
                 document.getElementById("display").innerText = state.finalTimeStr;
             }
         } else if (state.status === "reset") {
+            playSfx('ready'); // Phát âm thanh sẵn sàng
             clearInterval(timerInterval);
             document.getElementById("display").innerText = "00:00:00:000";
             document.getElementById("activeTeam").innerText = state.team;
