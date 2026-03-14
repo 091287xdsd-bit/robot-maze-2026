@@ -52,6 +52,19 @@
 </head>
 <body>
 
+<div id="soundUnlock" style="position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:9999; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+    <h2 style="color:var(--neon)">HỆ THỐNG ĐÃ SẴN SÀNG</h2>
+    <button onclick="unlockSound()" style="background:var(--neon); color:black; padding:15px 30px; border-radius:10px; font-weight:bold; cursor:pointer; border:none;">NHẤN VÀO ĐÂY ĐỂ BẬT ÂM THANH LIVE</button>
+</div>
+
+<script>
+function unlockSound() {
+    // Phát thử một âm thanh cực ngắn để xin quyền trình duyệt
+    playSfx('ready');
+    document.getElementById('soundUnlock').style.display = 'none';
+}
+</script>
+
 <div class="header">
     <div style="font-size: 1.2rem; font-weight: bold; letter-spacing: 2px;">ROBOT MAZE <span style="color:var(--neon)">CHAMPIONSHIP 2026</span></div>
     <div class="live-tag">● LIVE STREAM</div>
@@ -149,12 +162,6 @@
         setTimeout(() => {
             sounds[name].play().catch(e => console.warn("Âm thanh bị chặn. Hãy click vào web 1 lần."));
         }, 50);
-    }
-
-    // Hàm hỗ trợ phát âm thanh
-    function playSfx(name) {
-        sounds[name].currentTime = 0; // Chơi lại từ đầu nếu đang phát nửa chừng
-        sounds[name].play().catch(e => console.log("Cần tương tác với web để phát nhạc"));
     }
 
     // --- 3. ĐỒNG BỘ THỜI GIAN MÁY CHỦ (CHỐNG TRỄ GIÂY) ---
@@ -263,12 +270,11 @@
         });
     }
 
-    // Xóa một kết quả thi đấu cụ thể
     function deleteRecord(id) {
         if(!isAdmin) return;
-        playSfx('failed'); // Phát âm thanh xóa
         if(confirm("Xóa kết quả này trên Cloud?")) {
             db.ref("maze_results/" + id).remove();
+            db.ref("current_state/last_event").set({ type: "deleted", time: Date.now() });
         }
     }
 
@@ -298,6 +304,10 @@
     db.ref("current_state").on("value", (snapshot) => {
         const state = snapshot.val();
         if (!state) return;
+
+        if (state.last_event && state.last_event.type === "deleted") {
+            playSfx('failed');
+        }
 
         if (state.status === "running") {
             // Khi Admin bấm Start, khán giả tự khởi động đồng hồ dựa trên mốc Server
