@@ -197,6 +197,7 @@
         const roundName = document.getElementById("roundSelect").value;
         
         // Gửi tín hiệu báo "Đang chạy" cho tất cả mọi người xem
+        playSfx('go');
         db.ref("current_state").set({
             status: "running",
             team: teamName,
