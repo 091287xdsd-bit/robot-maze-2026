@@ -286,11 +286,12 @@
 
         if (state.status === "running") {
             // Khi Admin bấm Start, khán giả tự khởi động đồng hồ dựa trên mốc Server
-            playSfx('go'); // Phát âm thanh sẵn sàng
+            
             document.getElementById("activeTeam").innerText = state.team;
             startTime = state.startTimestamp;
             
             clearInterval(timerInterval);
+            playSfx('go'); // Phát âm thanh sẵn sàng
             timerInterval = setInterval(() => {
                 const diff = getTrueTime() - startTime;
                 document.getElementById("display").innerText = formatTime(diff > 0 ? diff : 0);
@@ -298,14 +299,14 @@
             
         
         } else if (state.status === "stopped") {
-            playSfx('finish'); // Phát âm thanh kết thúc
             clearInterval(timerInterval);
+            playSfx('finish'); // Phát âm thanh kết thúc
             if (state.finalTimeStr) {
                 document.getElementById("display").innerText = state.finalTimeStr;
             }
         } else if (state.status === "reset") {
-            playSfx('ready'); // Phát âm thanh sẵn sàng
             clearInterval(timerInterval);
+            playSfx('ready'); // Phát âm thanh sẵn sàng
             document.getElementById("display").innerText = "00:00:00:000";
             document.getElementById("activeTeam").innerText = state.team;
         }
