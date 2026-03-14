@@ -128,12 +128,13 @@
     const db = firebase.database();
     
     // Hệ thống âm thanh
+    // Hệ thống âm thanh (Đã thay link mới ổn định 100%)
     const sounds = {
-        go: new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3'), // Tiếng beep go
-        finish: new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3'), // Tiếng chuông về đích
-        ready: new Audio('https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3'), // Tiếng máy sẵn sàng
-        failed: new Audio('https://assets.mixkit.co/active_storage/sfx/253/253-preview.mp3'), // Tiếng "ố ồ" khi xóa
-        victory: new Audio('https://assets.mixkit.co/active_storage/sfx/1433/1433-preview.mp3') // Tiếng vỗ tay/vui vẻ
+        go: new Audio('https://cdn.pixabay.com/audio/2022/10/30/audio_f310f8489c.mp3'), 
+        finish: new Audio('https://cdn.pixabay.com/audio/2022/03/10/audio_73147814c8.mp3'), 
+        ready: new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_822430a58a.mp3'),
+        failed: new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_65903b414e.mp3'),
+        victory: new Audio('https://cdn.pixabay.com/audio/2021/08/04/audio_9583488277.mp3')
     };
 
     // Hàm hỗ trợ phát âm thanh
