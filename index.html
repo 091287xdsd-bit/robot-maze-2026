@@ -127,9 +127,6 @@
     }
     const db = firebase.database();
     
-    // Hệ thống âm thanh
-    // Hệ thống âm thanh (Đã thay link mới ổn định 100%)
-    // Thay thế đoạn cũ bằng đoạn này
     const sounds = {
         go: new Audio('go.mp3'), 
         finish: new Audio('finish.mp3'), 
@@ -137,6 +134,22 @@
         failed: new Audio('failed.mp3'),
         victory: new Audio('victory.mp3')
     };
+
+    // Ép nạp sẵn âm thanh để không bị trễ
+    Object.values(sounds).forEach(s => {
+        s.load();
+        s.preload = "auto";
+    });
+
+    function playSfx(name) {
+        if (!sounds[name]) return;
+        sounds[name].pause(); // Dừng âm thanh cũ nếu đang kêu
+        sounds[name].currentTime = 0; // Reset về giây thứ 0
+        // Chờ một chút để trình duyệt kịp xử lý rồi mới phát
+        setTimeout(() => {
+            sounds[name].play().catch(e => console.warn("Âm thanh bị chặn. Hãy click vào web 1 lần."));
+        }, 50);
+    }
 
     // Hàm hỗ trợ phát âm thanh
     function playSfx(name) {
@@ -307,33 +320,40 @@
                 document.getElementById("display").innerText = state.finalTimeStr;
             }
         } else if (state.status === "reset") {
-            clearInterval(timerInterval);
+            clearInterval(timerInterval); // Dừng đồng hồ chính
+            if (window.rewindTimer) clearInterval(window.rewindTimer); // Xóa hiệu ứng cũ nếu có
+            
             playSfx('ready');
-            
             const display = document.getElementById("display");
-            const activeTeam = document.getElementById("activeTeam");
             
-            // phân tích thành mili s
-            let p = display.innerText.split(':');
+            // Lấy thời gian hiện tại để tính mốc bắt đầu tua
+            let p = display.innerText.trim().split(':');
+            if (p.length < 4) return; // Tránh lỗi nếu format sai
+            
             let currentMs = (+p[0] * 3600000) + (+p[1] * 60000) + (+p[2] * 1000) + (+p[3]);
+            if (currentMs <= 0) {
+                display.innerText = "00:00:00:000";
+                document.getElementById("activeTeam").innerText = state.team;
+                return;
+            }
 
             const startAnim = Date.now();
-            const duration = 1000; // ép chạy lại 1s
+            const duration = 1000; // Hiệu ứng kéo dài đúng 1 giây
 
-            const rewindTimer = setInterval(() => {
+            window.rewindTimer = setInterval(() => {
                 const elapsed = Date.now() - startAnim;
                 const progress = elapsed / duration;
 
                 if (progress >= 1) {
-                    clearInterval(rewindTimer);
+                    clearInterval(window.rewindTimer);
                     display.innerText = "00:00:00:000";
-                    activeTeam.innerText = state.team;
+                    document.getElementById("activeTeam").innerText = state.team;
                 } else {
-                    // Công thức tua ngược
+                    // Tua ngược từ currentMs về 0
                     let val = Math.floor(currentMs * (1 - progress));
                     display.innerText = formatTime(val);
                 }
-            }, 10);// cập nhật lại mỗi 10milis
+            }, 15);
         }
     });
 
