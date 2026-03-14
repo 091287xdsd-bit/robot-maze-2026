@@ -129,12 +129,13 @@
     
     // Hệ thống âm thanh
     // Hệ thống âm thanh (Đã thay link mới ổn định 100%)
+    // Thay thế đoạn cũ bằng đoạn này
     const sounds = {
-        go: new Audio('https://cdn.pixabay.com/audio/2022/10/30/audio_f310f8489c.mp3'), 
-        finish: new Audio('https://cdn.pixabay.com/audio/2022/03/10/audio_73147814c8.mp3'), 
-        ready: new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_822430a58a.mp3'),
-        failed: new Audio('https://cdn.pixabay.com/audio/2022/03/15/audio_65903b414e.mp3'),
-        victory: new Audio('https://cdn.pixabay.com/audio/2021/08/04/audio_9583488277.mp3')
+        go: new Audio('go.mp3'), 
+        finish: new Audio('finish.mp3'), 
+        ready: new Audio('ready.mp3'),
+        failed: new Audio('failed.mp3'),
+        victory: new Audio('victory.mp3')
     };
 
     // Hàm hỗ trợ phát âm thanh
@@ -198,7 +199,6 @@
         const roundName = document.getElementById("roundSelect").value;
         
         // Gửi tín hiệu báo "Đang chạy" cho tất cả mọi người xem
-        playSfx('go');
         db.ref("current_state").set({
             status: "running",
             team: teamName,
@@ -308,9 +308,32 @@
             }
         } else if (state.status === "reset") {
             clearInterval(timerInterval);
-            playSfx('ready'); // Phát âm thanh sẵn sàng
-            document.getElementById("display").innerText = "00:00:00:000";
-            document.getElementById("activeTeam").innerText = state.team;
+            playSfx('ready');
+            
+            const display = document.getElementById("display");
+            const activeTeam = document.getElementById("activeTeam");
+            
+            // phân tích thành mili s
+            let p = display.innerText.split(':');
+            let currentMs = (+p[0] * 3600000) + (+p[1] * 60000) + (+p[2] * 1000) + (+p[3]);
+
+            const startAnim = Date.now();
+            const duration = 1000; // ép chạy lại 1s
+
+            const rewindTimer = setInterval(() => {
+                const elapsed = Date.now() - startAnim;
+                const progress = elapsed / duration;
+
+                if (progress >= 1) {
+                    clearInterval(rewindTimer);
+                    display.innerText = "00:00:00:000";
+                    activeTeam.innerText = state.team;
+                } else {
+                    // Công thức tua ngược
+                    let val = Math.floor(currentMs * (1 - progress));
+                    display.innerText = formatTime(val);
+                }
+            }, 10);// cập nhật lại mỗi 10milis
         }
     });
 
