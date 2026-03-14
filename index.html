@@ -18,7 +18,7 @@
         /* MẶC ĐỊNH ẨN CÁC THÀNH PHẦN CỦA ADMIN */
         .admin-only { display: none !important; }
         
-        /* NẾU LÀ ADMIN THÌ MỚI HIỆN RA */
+        /* krt admin */
         body.is-admin .admin-only { display: flex !important; }
         body.is-admin button.admin-only { display: inline-block !important; }
         body.is-admin th.admin-only, body.is-admin td.admin-only { display: table-cell !important; }
@@ -59,7 +59,7 @@
 
 <script>
 function unlockSound() {
-    // Phát thử một âm thanh cực ngắn để xin quyền trình duyệt
+    // thử phát âm thanh xin quyền
     playSfx('ready');
     document.getElementById('soundUnlock').style.display = 'none';
 }
@@ -119,7 +119,6 @@ function unlockSound() {
     const isAdmin = urlParams.get('admin') === 'phongtin'; // Pass
     
     if (isAdmin) {
-        // Mở khóa giao diện hiển thị các nút điều khiển
         document.body.classList.add('is-admin');
     }
 
@@ -156,9 +155,8 @@ function unlockSound() {
 
     function playSfx(name) {
         if (!sounds[name]) return;
-        sounds[name].pause(); // Dừng âm thanh cũ nếu đang kêu
-        sounds[name].currentTime = 0; // Reset về giây thứ 0
-        // Chờ một chút để trình duyệt kịp xử lý rồi mới phát
+        sounds[name].pause();
+        sounds[name].currentTime = 0; 
         setTimeout(() => {
             sounds[name].play().catch(e => console.warn("Âm thanh bị chặn. Hãy click vào web 1 lần."));
         }, 50);
@@ -187,17 +185,14 @@ function unlockSound() {
         const data = snapshot.val();
         const newData = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
         
-        // Tìm thời gian nhanh nhất của vòng đang thi đấu
         const timesInRound = newData.filter(i => i.round === currentTab).map(i => i.time);
         const currentBest = timesInRound.length > 0 ? Math.min(...timesInRound) : Infinity;
 
-        // Nếu kỷ lục mới tốt hơn kỷ lục cũ và không phải lần đầu load trang
         if (currentBest < records[currentTab] && records[currentTab] !== Infinity) {
-            playSfx('victory'); // Phát nhạc chiến thắng
-            showVictoryEffect(); // Làm màn hình nhấp nháy vàng
+            playSfx('victory');
+            showVictoryEffect();
         }
 
-        // Cập nhật kỷ lục vào sổ tay
         records[currentTab] = currentBest;
         database = newData;
         renderAll();
@@ -214,11 +209,10 @@ function unlockSound() {
 
     // 4. LOGIC ĐIỀU KHIỂN CỦA ADMIN
     function startTimer() {
-        if (!isAdmin) return; // Khóa chức năng với khách
+        if (!isAdmin) return;
         const teamName = document.getElementById("teamInput").value || "Ẩn danh";
         const roundName = document.getElementById("roundSelect").value;
         
-        // Gửi tín hiệu báo "Đang chạy" cho tất cả mọi người xem
         db.ref("current_state").set({
             status: "running",
             team: teamName,
@@ -229,24 +223,21 @@ function unlockSound() {
 
     // Hàm dừng đồng hồ và chốt kết quả
     function stopTimer() {
-        if (!isAdmin) return; // Khóa chức năng với khách
+        if (!isAdmin) return;
 
         const stopTimestamp = getTrueTime();
-        // Tính giờ thực tế từ Firebase để chốt kết quả siêu chính xác
         db.ref("current_state").once("value", (snapshot) => {
             const state = snapshot.val();
             if(state && state.status === "running") {
                 const finalElapsed = stopTimestamp - state.startTimestamp;
                 const finalTimeStr = formatTime(finalElapsed);
                 
-                // Báo cho khán giả dừng đồng hồ
                 db.ref("current_state").set({
                     status: "stopped",
                     finalTimeStr: finalTimeStr,
                     team: state.team
                 });
 
-                // Lưu lên bảng xếp hạng
                 const record = { 
                     team: state.team, 
                     round: state.round, 
@@ -288,7 +279,7 @@ function unlockSound() {
         }
     }
 
-    // Xóa toàn bộ lịch sử thi đấu của đội được chọn
+    // Xóa lịch sử thi của đội
     function resetTeam() {
         if(!isAdmin) return;
         const team = document.getElementById("teamFilter").value;
@@ -300,71 +291,71 @@ function unlockSound() {
         }
     }
 
-    // 5. Lệnh admin cho khán giả
+    // nghe lệnh từ admin
+    let lastStatus = ""; 
     db.ref("current_state").on("value", (snapshot) => {
         const state = snapshot.val();
         if (!state) return;
 
         if (state.last_event && state.last_event.type === "deleted") {
-            playSfx('failed');
+            if (Date.now() - state.last_event.time < 2000) {
+                playSfx('failed');
+                return; 
+            }
         }
 
         if (state.status === "running") {
-            // Khi Admin bấm Start, khán giả tự khởi động đồng hồ dựa trên mốc Server
+            if (lastStatus !== "running") playSfx('go');
             
             document.getElementById("activeTeam").innerText = state.team;
             startTime = state.startTimestamp;
             
             clearInterval(timerInterval);
-            playSfx('go'); // Phát âm thanh sẵn sàng
             timerInterval = setInterval(() => {
                 const diff = getTrueTime() - startTime;
                 document.getElementById("display").innerText = formatTime(diff > 0 ? diff : 0);
             }, 10);
             
-        
         } else if (state.status === "stopped") {
+            if (lastStatus === "running") {
+                playSfx('finish');
+            }
+            
             clearInterval(timerInterval);
-            playSfx('finish'); // Phát âm thanh kết thúc
             if (state.finalTimeStr) {
                 document.getElementById("display").innerText = state.finalTimeStr;
             }
         } else if (state.status === "reset") {
-            clearInterval(timerInterval); // Dừng đồng hồ chính
-            if (window.rewindTimer) clearInterval(window.rewindTimer); // Xóa hiệu ứng cũ nếu có
+            if (lastStatus !== "reset") playSfx('ready');
             
-            playSfx('ready');
+            clearInterval(timerInterval);
+            if (window.rewindTimer) clearInterval(window.rewindTimer);
+            
             const display = document.getElementById("display");
+            const activeTeam = document.getElementById("activeTeam");
             
-            // Lấy thời gian hiện tại để tính mốc bắt đầu tua
             let p = display.innerText.trim().split(':');
-            if (p.length < 4) return; // Tránh lỗi nếu format sai
+            if (p.length < 4) return;
             
             let currentMs = (+p[0] * 3600000) + (+p[1] * 60000) + (+p[2] * 1000) + (+p[3]);
-            if (currentMs <= 0) {
-                display.innerText = "00:00:00:000";
-                document.getElementById("activeTeam").innerText = state.team;
-                return;
-            }
-
             const startAnim = Date.now();
-            const duration = 1000; // Hiệu ứng kéo dài đúng 1 giây
+            const duration = 1000;
 
             window.rewindTimer = setInterval(() => {
                 const elapsed = Date.now() - startAnim;
                 const progress = elapsed / duration;
-
                 if (progress >= 1) {
                     clearInterval(window.rewindTimer);
                     display.innerText = "00:00:00:000";
-                    document.getElementById("activeTeam").innerText = state.team;
+                    activeTeam.innerText = state.team;
                 } else {
-                    // Tua ngược từ currentMs về 0
                     let val = Math.floor(currentMs * (1 - progress));
                     display.innerText = formatTime(val);
                 }
             }, 15);
         }
+        
+        lastStatus = state.status;
     });
 
     // 6. render lại toàn bộ giao diện khi có thay đổi dữ liệu
