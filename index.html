@@ -306,7 +306,6 @@ function unlockSound() {
 
         if (state.status === "running") {
             if (lastStatus !== "running") playSfx('go');
-            
             document.getElementById("activeTeam").innerText = state.team;
             startTime = state.startTimestamp;
             
@@ -317,42 +316,33 @@ function unlockSound() {
             }, 10);
             
         } else if (state.status === "stopped") {
+            // NẾU TRẠNG THÁI VỪA CHUYỂN TỪ RUNNING SANG STOPPED
             if (lastStatus === "running") {
                 playSfx('finish');
-            }
-            
-            clearInterval(timerInterval);
-            if (state.finalTimeStr) {
+                clearInterval(timerInterval);
+                
+                // CHỈ MÁY ADMIN MỚI THỰC HIỆN LƯU KẾT QUẢ
+                if (isAdmin) {
+                    const stopTimestamp = getTrueTime();
+                    const finalElapsed = stopTimestamp - state.startTimestamp;
+                    const finalTimeStr = formatTime(finalElapsed);
+                    
+                    document.getElementById("display").innerText = finalTimeStr;
+
+                    // Đẩy kết quả lên Bảng xếp hạng
+                    const record = { 
+                        team: state.team, 
+                        round: state.round || "Vòng Loại 1", 
+                        time: finalElapsed, 
+                        timeStr: finalTimeStr,
+                        timestamp: stopTimestamp
+                    };
+                    db.ref("maze_results").push(record);
+                }
+            } else if (state.finalTimeStr) {
                 document.getElementById("display").innerText = state.finalTimeStr;
             }
-        } else if (state.status === "reset") {
-            if (lastStatus !== "reset") playSfx('ready');
-            
             clearInterval(timerInterval);
-            if (window.rewindTimer) clearInterval(window.rewindTimer);
-            
-            const display = document.getElementById("display");
-            const activeTeam = document.getElementById("activeTeam");
-            
-            let p = display.innerText.trim().split(':');
-            if (p.length < 4) return;
-            
-            let currentMs = (+p[0] * 3600000) + (+p[1] * 60000) + (+p[2] * 1000) + (+p[3]);
-            const startAnim = Date.now();
-            const duration = 1000;
-
-            window.rewindTimer = setInterval(() => {
-                const elapsed = Date.now() - startAnim;
-                const progress = elapsed / duration;
-                if (progress >= 1) {
-                    clearInterval(window.rewindTimer);
-                    display.innerText = "00:00:00:000";
-                    activeTeam.innerText = state.team;
-                } else {
-                    let val = Math.floor(currentMs * (1 - progress));
-                    display.innerText = formatTime(val);
-                }
-            }, 15);
         }
         
         lastStatus = state.status;
