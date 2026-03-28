@@ -291,60 +291,55 @@ function unlockSound() {
         }
     }
 
-    // nghe lệnh từ admin
+    // 5. NGHE LỆNH TỪ FIREBASE (ADMIN & ESP32)
     let lastStatus = ""; 
     db.ref("current_state").on("value", (snapshot) => {
         const state = snapshot.val();
         if (!state) return;
 
-        if (state.last_event && state.last_event.type === "deleted") {
-            if (Date.now() - state.last_event.time < 2000) {
-                playSfx('failed');
-                return; 
-            }
-        }
-
+        // Nếu trạng thái là RUNNING (ESP vạch START kích hoạt)
         if (state.status === "running") {
             if (lastStatus !== "running") playSfx('go');
-            document.getElementById("activeTeam").innerText = state.team;
-            startTime = state.startTimestamp;
             
+            // Lấy tên từ Firebase (do bạn nhập trên Web), nếu trống thì ghi Ẩn danh
+            const currentTeam = state.team && state.team.trim() !== "" ? state.team : "ẨN DANH";
+            document.getElementById("activeTeam").innerText = currentTeam;
+            
+            startTime = state.startTimestamp;
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 const diff = getTrueTime() - startTime;
-                document.getElementById("display").innerText = formatTime(diff > 0 ? diff : 0);
+                // Chống số âm bằng Math.max(0, ...)
+                document.getElementById("display").innerText = formatTime(Math.max(0, diff));
             }, 10);
             
-        } else if (state.status === "stopped") {
-            // NẾU TRẠNG THÁI VỪA CHUYỂN TỪ RUNNING SANG STOPPED
+        } 
+        // Nếu trạng thái là STOPPED (ESP vạch STOP kích hoạt)
+        else if (state.status === "stopped") {
             if (lastStatus === "running") {
                 playSfx('finish');
                 clearInterval(timerInterval);
-                
-                // CHỈ MÁY ADMIN MỚI THỰC HIỆN LƯU KẾT QUẢ
-                if (isAdmin) {
-                    const stopTimestamp = getTrueTime();
-                    const finalElapsed = stopTimestamp - state.startTimestamp;
-                    const finalTimeStr = formatTime(finalElapsed);
-                    
-                    document.getElementById("display").innerText = finalTimeStr;
 
-                    // Đẩy kết quả lên Bảng xếp hạng
-                    const record = { 
-                        team: state.team, 
-                        round: state.round || "Vòng Loại 1", 
-                        time: finalElapsed, 
+                // LẤY THỜI ĐIỂM DỪNG TỪ FIREBASE (Chống lệch giây, hết lỗi số âm)
+                const stopTime = state.stopTimestamp || getTrueTime();
+                const finalElapsed = stopTime - state.startTimestamp;
+                const finalTimeStr = formatTime(Math.max(0, finalElapsed));
+                
+                document.getElementById("display").innerText = finalTimeStr;
+
+                // CHỈ MÁY ADMIN MỚI LƯU VÀO DATABASE
+                if (isAdmin) {
+                    const currentTeam = state.team && state.team.trim() !== "" ? state.team : "ẨN DANH";
+                    db.ref("maze_results").push({
+                        team: currentTeam,
+                        round: state.round || "Vòng Loại 1",
+                        time: finalElapsed,
                         timeStr: finalTimeStr,
-                        timestamp: stopTimestamp
-                    };
-                    db.ref("maze_results").push(record);
+                        timestamp: stopTime
+                    });
                 }
-            } else if (state.finalTimeStr) {
-                document.getElementById("display").innerText = state.finalTimeStr;
             }
-            clearInterval(timerInterval);
         }
-        
         lastStatus = state.status;
     });
 
