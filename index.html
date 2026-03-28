@@ -210,7 +210,8 @@ function unlockSound() {
     // 4. LOGIC ĐIỀU KHIỂN CỦA ADMIN
     function startTimer() {
         if (!isAdmin) return;
-        const teamName = document.getElementById("teamInput").value || "Ẩn danh";
+        // Lấy tên từ ô nhập, nếu trống thì ghi "Ẩn danh"
+        const teamName = document.getElementById("teamInput").value.trim() || "Ẩn danh";
         const roundName = document.getElementById("roundSelect").value;
         
         db.ref("current_state").set({
@@ -254,10 +255,11 @@ function unlockSound() {
     // Hàm reset đồng hồ về 00:00:00:000 và trạng thái sẵn sàng
     function resetClock() {
         if (!isAdmin) return;
-        // Gửi tín hiệu reset về 00:00:00:000 cho tất cả mọi người
+        // Khi Reset, ta giữ lại tên đội đang nhập để thi đấu lại
+        const teamName = document.getElementById("teamInput").value.trim() || "Ẩn danh";
         db.ref("current_state").set({
             status: "reset",
-            team: "SẴN SÀNG"
+            team: teamName
         });
     }
 
@@ -292,52 +294,66 @@ function unlockSound() {
     }
 
     // 5. NGHE LỆNH TỪ FIREBASE (ADMIN & ESP32)
-    let lastStatus = ""; 
+    let lastStatus = "";
     db.ref("current_state").on("value", (snapshot) => {
         const state = snapshot.val();
         if (!state) return;
 
-        // Nếu trạng thái là RUNNING (ESP vạch START kích hoạt)
+        const display = document.getElementById("display");
+        const activeTeam = document.getElementById("activeTeam");
+
         if (state.status === "running") {
             if (lastStatus !== "running") playSfx('go');
-            
-            // Lấy tên từ Firebase (do bạn nhập trên Web), nếu trống thì ghi Ẩn danh
-            const currentTeam = state.team && state.team.trim() !== "" ? state.team : "ẨN DANH";
-            document.getElementById("activeTeam").innerText = currentTeam;
-            
+            activeTeam.innerText = state.team || "Ẩn danh";
             startTime = state.startTimestamp;
+            
             clearInterval(timerInterval);
             timerInterval = setInterval(() => {
                 const diff = getTrueTime() - startTime;
-                // Chống số âm bằng Math.max(0, ...)
-                document.getElementById("display").innerText = formatTime(Math.max(0, diff));
+                display.innerText = formatTime(Math.max(0, diff));
             }, 10);
             
-        } 
-        // Nếu trạng thái là STOPPED (ESP vạch STOP kích hoạt)
-        else if (state.status === "stopped") {
+        } else if (state.status === "stopped") {
             if (lastStatus === "running") {
                 playSfx('finish');
                 clearInterval(timerInterval);
-
-                // LẤY THỜI ĐIỂM DỪNG TỪ FIREBASE (Chống lệch giây, hết lỗi số âm)
+                
                 const stopTime = state.stopTimestamp || getTrueTime();
                 const finalElapsed = stopTime - state.startTimestamp;
                 const finalTimeStr = formatTime(Math.max(0, finalElapsed));
-                
-                document.getElementById("display").innerText = finalTimeStr;
+                display.innerText = finalTimeStr;
 
-                // CHỈ MÁY ADMIN MỚI LƯU VÀO DATABASE
                 if (isAdmin) {
-                    const currentTeam = state.team && state.team.trim() !== "" ? state.team : "ẨN DANH";
                     db.ref("maze_results").push({
-                        team: currentTeam,
+                        team: state.team || "Ẩn danh",
                         round: state.round || "Vòng Loại 1",
                         time: finalElapsed,
                         timeStr: finalTimeStr,
                         timestamp: stopTime
                     });
                 }
+            }
+        } else if (state.status === "reset") {
+            clearInterval(timerInterval);
+            if (lastStatus !== "reset") {
+                playSfx('ready');
+                // Hiệu ứng tua ngược
+                let p = display.innerText.split(':');
+                let currentMs = (+p[0] * 3600000) + (+p[1] * 60000) + (+p[2] * 1000) + (+p[3]);
+                const startAnim = Date.now();
+                const duration = 800;
+
+                const rewind = setInterval(() => {
+                    const elapsed = Date.now() - startAnim;
+                    const progress = elapsed / duration;
+                    if (progress >= 1) {
+                        clearInterval(rewind);
+                        display.innerText = "00:00:00:000";
+                        activeTeam.innerText = state.team || "SẴN SÀNG";
+                    } else {
+                        display.innerText = formatTime(Math.floor(currentMs * (1 - progress)));
+                    }
+                }, 15);
             }
         }
         lastStatus = state.status;
