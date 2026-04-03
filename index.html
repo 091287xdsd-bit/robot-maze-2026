@@ -207,55 +207,77 @@ function unlockSound() {
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${milis.toString().padStart(3, '0')}`;
     }
 
-    // 4. LOGIC ĐIỀU KHIỂN CỦA ADMIN
+    // --- CÁC BIẾN CỜ CHỐNG NHIỄU ---
+    let isTimerRunning = false;
+
+    // 4. LOGIC ĐIỀU KHIỂN CỦA ADMIN (ZERO LATENCY)
     function startTimer() {
-        if (!isAdmin) return;
-        // Lấy tên từ ô nhập, nếu trống thì ghi "Ẩn danh"
+        if (!isAdmin || isTimerRunning) return;
+        isTimerRunning = true;
+
         const teamName = document.getElementById("teamInput").value.trim() || "Ẩn danh";
         const roundName = document.getElementById("roundSelect").value;
-        
+        const now = getTrueTime();
+
+        // CHẠY NGAY LẬP TỨC TRÊN MÁY ADMIN 
+        startTime = now;
+        clearInterval(timerInterval);
+        playSfx('go');
+        document.getElementById("activeTeam").innerText = teamName;
+        timerInterval = setInterval(() => {
+            const diff = getTrueTime() - startTime;
+            document.getElementById("display").innerText = formatTime(Math.max(0, diff));
+        }, 10);
+
+        // BÁO CHO FIREBASE ĐỂ KHÁN GIẢ ĐỒNG BỘ
         db.ref("current_state").set({
             status: "running",
             team: teamName,
             round: roundName,
-            startTimestamp: getTrueTime()
+            startTimestamp: now
         });
     }
 
-    // Hàm dừng đồng hồ và chốt kết quả
     function stopTimer() {
-        if (!isAdmin) return;
+        if (!isAdmin || !isTimerRunning) return;
+        isTimerRunning = false;
 
         const stopTimestamp = getTrueTime();
-        db.ref("current_state").once("value", (snapshot) => {
-            const state = snapshot.val();
-            if(state && state.status === "running") {
-                const finalElapsed = stopTimestamp - state.startTimestamp;
-                const finalTimeStr = formatTime(finalElapsed);
-                
-                db.ref("current_state").set({
-                    status: "stopped",
-                    finalTimeStr: finalTimeStr,
-                    team: state.team
-                });
+        
+        // DỪNG NGAY LẬP TỨC TRÊN MÁY ADMIN
+        playSfx('finish');
+        clearInterval(timerInterval);
+        const finalElapsed = stopTimestamp - startTime;
+        const finalTimeStr = formatTime(Math.max(0, finalElapsed));
+        document.getElementById("display").innerText = finalTimeStr;
 
-                const record = { 
-                    team: state.team, 
-                    round: state.round, 
-                    time: finalElapsed, 
-                    timeStr: finalTimeStr,
-                    timestamp: getTrueTime()
-                };
-                db.ref("maze_results").push(record);
-                currentTab = state.round;
-            }
+        const teamName = document.getElementById("activeTeam").innerText;
+        const roundName = document.getElementById("roundSelect").value;
+
+        // CHỐT KẾT QUẢ LÊN FIREBASE
+        db.ref("current_state").set({
+            status: "stopped",
+            finalTimeStr: finalTimeStr,
+            team: teamName,
+            stopTimestamp: stopTimestamp,
+            startTimestamp: startTime,
+            round: roundName
         });
+
+        // LƯU VÀO BẢNG XẾP HẠNG
+        db.ref("maze_results").push({
+            team: teamName,
+            round: roundName,
+            time: finalElapsed,
+            timeStr: finalTimeStr,
+            timestamp: stopTimestamp
+        });
+        currentTab = roundName;
     }
 
-    // Hàm reset đồng hồ về 00:00:00:000 và trạng thái sẵn sàng
     function resetClock() {
         if (!isAdmin) return;
-        // Khi Reset, ta giữ lại tên đội đang nhập để thi đấu lại
+        isTimerRunning = false;
         const teamName = document.getElementById("teamInput").value.trim() || "Ẩn danh";
         db.ref("current_state").set({
             status: "reset",
@@ -271,7 +293,6 @@ function unlockSound() {
         }
     }
 
-    // Xóa toàn bộ kết quả của vòng đang xem
     function resetRound() {
         if(!isAdmin) return;
         if(confirm(`Xóa TẤT CẢ kết quả của ${currentTab}?`)) {
@@ -281,7 +302,6 @@ function unlockSound() {
         }
     }
 
-    // Xóa lịch sử thi của đội
     function resetTeam() {
         if(!isAdmin) return;
         const team = document.getElementById("teamFilter").value;
@@ -293,11 +313,13 @@ function unlockSound() {
         }
     }
 
-    // 5. NGHE LỆNH TỪ FIREBASE (ADMIN & ESP32)
+    // 5. dành cho khán giả
     let lastStatus = "";
     db.ref("current_state").on("value", (snapshot) => {
         const state = snapshot.val();
         if (!state) return;
+
+        if (isAdmin && state.status !== "reset") return;
 
         const display = document.getElementById("display");
         const activeTeam = document.getElementById("activeTeam");
@@ -317,49 +339,21 @@ function unlockSound() {
             if (lastStatus === "running") {
                 playSfx('finish');
                 clearInterval(timerInterval);
-                
-                const stopTime = state.stopTimestamp || getTrueTime();
-                const finalElapsed = stopTime - state.startTimestamp;
-                const finalTimeStr = formatTime(Math.max(0, finalElapsed));
+                const finalTimeStr = state.finalTimeStr || "00:00:00:000";
                 display.innerText = finalTimeStr;
-
-                if (isAdmin) {
-                    db.ref("maze_results").push({
-                        team: state.team || "Ẩn danh",
-                        round: state.round || "Vòng Loại 1",
-                        time: finalElapsed,
-                        timeStr: finalTimeStr,
-                        timestamp: stopTime
-                    });
-                }
             }
         } else if (state.status === "reset") {
             clearInterval(timerInterval);
             if (lastStatus !== "reset") {
                 playSfx('ready');
-                // Hiệu ứng tua ngược
-                let p = display.innerText.split(':');
-                let currentMs = (+p[0] * 3600000) + (+p[1] * 60000) + (+p[2] * 1000) + (+p[3]);
-                const startAnim = Date.now();
-                const duration = 800;
-
-                const rewind = setInterval(() => {
-                    const elapsed = Date.now() - startAnim;
-                    const progress = elapsed / duration;
-                    if (progress >= 1) {
-                        clearInterval(rewind);
-                        display.innerText = "00:00:00:000";
-                        activeTeam.innerText = state.team || "SẴN SÀNG";
-                    } else {
-                        display.innerText = formatTime(Math.floor(currentMs * (1 - progress)));
-                    }
-                }, 15);
+                display.innerText = "00:00:00:000";
+                activeTeam.innerText = state.team || "SẴN SÀNG";
             }
         }
         lastStatus = state.status;
     });
 
-    // 6. render lại toàn bộ giao diện khi có thay đổi dữ liệu
+    // 6. RENDER DỮ LIỆU
     function renderAll() {
         const rounds = ["Vòng Loại 1", "Vòng Loại 2", "Bán Kết", "Chung Kết"];
         let tabsHtml = "";
@@ -388,7 +382,6 @@ function unlockSound() {
         showTeamStats();
     }
 
-    // 7. Hiển thị chi tiết lịch sử thi đấu của đội khi
     function showTeamStats() {
         const team = document.getElementById("teamFilter").value;
         const content = document.getElementById("teamStatsContent");
@@ -405,7 +398,6 @@ function unlockSound() {
         content.innerHTML = html;
     }
 
-    // 8. Hiệu ứng chiến thắng khi có kỷ lục mới
     function showVictoryEffect() {
         let count = 0;
         const originalBg = "#050505";
@@ -419,6 +411,27 @@ function unlockSound() {
         }, 200);
     }
 
+    // --- 7. bộ não nhận tín hiệu ---
+    if (isAdmin) {
+        const LOCAL_WEBSOCKET_URL = 'ws://192.168.0.5:8080'; // chỉnh lại IPv4 nếu cần bằng inconfig
+        const localSocket = new WebSocket(LOCAL_WEBSOCKET_URL);
+
+        localSocket.onopen = () => console.log("🟢 Web Admin đã cắm phích vào Trạm Server!");
+
+        localSocket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.status === "running") {
+                    console.log("🚀 LASER 1 KÍCH HOẠT!");
+                    startTimer(); 
+                } 
+                else if (data.status === "stopped") {
+                    console.log("🛑 LASER 2 KÍCH HOẠT!");
+                    stopTimer(); 
+                }
+            } catch (e) {}
+        };
+    }
 </script>
 </body>
 </html>
