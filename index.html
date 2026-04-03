@@ -346,8 +346,28 @@ function unlockSound() {
             clearInterval(timerInterval);
             if (lastStatus !== "reset") {
                 playSfx('ready');
-                display.innerText = "00:00:00:000";
                 activeTeam.innerText = state.team || "SẴN SÀNG";
+                
+                // HIỆU ỨNG TUA NGƯỢC
+                const display = document.getElementById("display");
+                let parts = display.innerText.split(':');
+                let currentMs = 0;
+                
+                if (parts.length === 4) {
+                    currentMs = parseInt(parts[0])*3600000 + parseInt(parts[1])*60000 + parseInt(parts[2])*1000 + parseInt(parts[3]);
+                }
+                if (currentMs === 0) currentMs = 2000; 
+                
+                let step = currentMs / 15; 
+                let rewindInterval = setInterval(() => {
+                    currentMs -= step;
+                    if (currentMs <= 0) {
+                        clearInterval(rewindInterval);
+                        display.innerText = "00:00:00:000";
+                    } else {
+                        display.innerText = formatTime(Math.floor(currentMs));
+                    }
+                }, 30);
             }
         }
         lastStatus = state.status;
